@@ -4,43 +4,66 @@ from selenium.webdriver.support import expected_conditions as EC
 
 USERNAME = "standard_user"
 PASSWORD = "secret_sauce"
+TIMEOUT = 10
 
 
 def test_buy_product(browser, base_url):
-    wait = WebDriverWait(browser, 10)
+    wait = WebDriverWait(browser, TIMEOUT)
 
-    # 1. Переход на сайт
+    # ---------- Страница авторизации ----------
     browser.get(base_url)
+    username_input = wait.until(EC.visibility_of_element_located((By.ID, "user-name")))
+    password_input = wait.until(EC.visibility_of_element_located((By.ID, "password")))
+    login_button = wait.until(EC.element_to_be_clickable((By.ID, "login-button")))
 
-    # 2. Авторизация
-    browser.find_element(By.ID, "user-name").send_keys(USERNAME)
-    browser.find_element(By.ID, "password").send_keys(PASSWORD)
-    browser.find_element(By.ID, "login-button").click()
+    username_input.send_keys(USERNAME)
+    password_input.send_keys(PASSWORD)
+    login_button.click()
+
+    # ---------- Страница с товарами ----------
     wait.until(EC.url_contains("inventory"))
-
-    # 3. Добавление товара в корзину
-    browser.find_element(By.ID, "add-to-cart-sauce-labs-backpack").click()
-    badge = browser.find_element(By.CLASS_NAME, "shopping_cart_badge")
-    assert badge.text == "1", "В корзине должен быть 1 товар"
-
-    # 4. Переход в корзину и оформление
-    browser.find_element(By.CLASS_NAME, "shopping_cart_link").click()
-    wait.until(EC.url_contains("cart"))
-    browser.find_element(By.ID, "checkout").click()
-
-    # 5. Заполнение формы
-    wait.until(EC.visibility_of_element_located((By.ID, "first-name")))
-    browser.find_element(By.ID, "first-name").send_keys("Ivan")
-    browser.find_element(By.ID, "last-name").send_keys("Ivanov")
-    browser.find_element(By.ID, "postal-code").send_keys("123456")
-    browser.find_element(By.ID, "continue").click()
-
-    # 6. Покупка товара
-    wait.until(EC.url_contains("checkout-step-two"))
-    browser.find_element(By.ID, "finish").click()
-
-    # 7. Проверка успешности покупки
-    header = wait.until(
-        EC.visibility_of_element_located((By.CLASS_NAME, "complete-header"))
+    wait.until(EC.visibility_of_element_located((By.CLASS_NAME, "inventory_list")))
+    add_to_cart_button = wait.until(
+        EC.element_to_be_clickable((By.ID, "add-to-cart-sauce-labs-backpack"))
     )
+    add_to_cart_button.click()
+
+    # ждём, пока счётчик корзины покажет 1 товар
+    wait.until(
+        EC.text_to_be_present_in_element((By.CLASS_NAME, "shopping_cart_badge"), "1")
+    )
+    cart_link = wait.until(EC.element_to_be_clickable((By.CLASS_NAME, "shopping_cart_link")))
+    cart_link.click()
+
+    # ---------- Страница корзины ----------
+    wait.until(EC.url_contains("cart"))
+    wait.until(EC.visibility_of_element_located((By.CLASS_NAME, "cart_item")))
+    checkout_button = wait.until(EC.element_to_be_clickable((By.ID, "checkout")))
+    checkout_button.click()
+
+    # ---------- Страница с оформлением (форма) ----------
+    wait.until(EC.url_contains("checkout-step-one"))
+    first_name = wait.until(EC.visibility_of_element_located((By.ID, "first-name")))
+    last_name = wait.until(EC.visibility_of_element_located((By.ID, "last-name")))
+    postal_code = wait.until(EC.visibility_of_element_located((By.ID, "postal-code")))
+
+    first_name.send_keys("Ivan")
+    last_name.send_keys("Ivanov")
+    postal_code.send_keys("123456")
+
+    continue_button = wait.until(EC.element_to_be_clickable((By.ID, "continue")))
+    continue_button.click()
+
+    # ---------- Страница с оплатой товара ----------
+    wait.until(EC.url_contains("checkout-step-two"))
+    wait.until(EC.visibility_of_element_located((By.CLASS_NAME, "summary_info")))
+    finish_button = wait.until(EC.element_to_be_clickable((By.ID, "finish")))
+    finish_button.click()
+
+    # ---------- Текст об успешной покупке ----------
+    wait.until(EC.url_contains("checkout-complete"))
+    header = wait.until(EC.visibility_of_element_located((By.CLASS_NAME, "complete-header")))
+    wait.until(EC.text_to_be_present_in_element(
+        (By.CLASS_NAME, "complete-header"), "Thank you for your order!"
+    ))
     assert header.text == "Thank you for your order!"
